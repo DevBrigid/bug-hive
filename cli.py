@@ -64,7 +64,7 @@ def add_user(username, role):
 
 @user_group.command(name="list")
 def list_users():
-    enforce_role() # Must be logged in, either admin or dev
+    enforce_role(required_role="admin") # Admin only
     users = get_all_users_task()
     if not users:
         click.echo(Fore.YELLOW + "No user records found.")
