@@ -6,5 +6,6 @@ User, Project, and Bug.
 from .User import User
 from .Project import Project
 from .Bug import Bug
+from .Gamification import Gamification
 
-__all__ = ["User", "Project", "Bug"]
+__all__ = ["User", "Project", "Bug", "Gamification"]

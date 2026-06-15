@@ -1,12 +1,36 @@
 {
     "users": {
+        "admin": {
+            "username": "admin",
+            "role": "admin"
+        },
         "Alice": {
             "username": "Alice",
             "role": "admin"
+        },
+        "Bob": {
+            "username": "Bob",
+            "role": "developer"
         }
     },
-    "projects": {},
+    "projects": {
+        "Mobile Core": {
+            "name": "Mobile Core",
+            "description": "React Native Application",
+            "members": [
+                "Bob"
+            ]
+        }
+    },
     "bugs": {},
-    "gamification": {},
-    "bug_counter": 0
+    "gamification": {
+        "Bob": {
+            "username": "Bob",
+            "xp": 0,
+            "level": 1,
+            "badges": []
+        }
+    },
+    "bug_counter": 0,
+    "current_session": "Bob"
 }
