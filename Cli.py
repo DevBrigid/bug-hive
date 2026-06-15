@@ -1,360 +1,202 @@
-import argparse
-import sys
+import click
+from tabulate import tabulate
+from colorama import Fore, Style, init
 
-from rich.console import Console
-from rich.table import Table
-
-from storage import Storage
+from storage import load_db, save_db
 from models.User import User
 from models.Project import Project
 from models.Bug import Bug
+from models.Gamification import Gamification
 
+# Initialize colorama for windows/unix global compatibility
+init(autoreset=True)
 
-console = Console()
+@click.group()
+def bughive():
+    # BugHive CLI Tool: Gamified task management for small dev squads.
+    pass
 
+# USER SUBSYSTEM 
+@bughive.group(name="user")
+def user_group():
+    # User profile control panel.
+    pass
 
-# Helper — resolve a user/project/bug by ID OR by name (case-insensitive)
-
-def resolve_user(storage, identifier):
-    user = storage.get_user_by_id(identifier) or storage.get_user_by_name(identifier)
-    return user
-
-
-def resolve_project(storage, identifier):
-    project = storage.get_project_by_id(identifier) or storage.get_project_by_name(identifier)
-    return project
-
-
-def resolve_bug(storage, identifier):
-    return storage.get_bug_by_id(identifier)
-
-
-# USER commands
-
-def cmd_add_user(args, storage):
-    if storage.get_user_by_name(args.name):
-        console.print(f"[red]A user named '{args.name}' already exists.[/red]")
+@user_group.command(name="add")
+@click.argument("username")
+@click.argument("role", type=click.Choice(["admin", "developer"]))
+def add_user(username, role):
+    db = load_db()
+    if username in db["users"]:
+        click.echo(Fore.RED + f"Error: The username '{username}' already exists.")
         return
+    
+    user = User(username, role)
+    db["users"][username] = user.to_dict()
+    # Initialize basic scoreboards instantly inside db profile storage
+    if role == "developer":
+        db["gamification"][username] = Gamification(username).to_dict()
+        
+    save_db(db)
+    click.echo(Fore.GREEN + f"Success: Registered {username} as a team '{role}'.")
 
-    user = User(name=args.name, role=args.role)
-    storage.add_user(user)
-    storage.save()
-
-    console.print(f"[green]User created:[/green] {user.name} "
-                   f"(role: [bold]{user.role}[/bold], id: {user.id})")
-
-
-def cmd_list_users(args, storage):
-    if not storage.users:
-        console.print("[yellow]No users found.[/yellow]")
+@user_group.command(name="list")
+def list_users():
+    db = load_db()
+    if not db["users"]:
+        click.echo(Fore.YELLOW + "No user records found.")
         return
+    
+    table_data = [[u["username"], u["role"]] for u in db["users"].values()]
+    click.echo(tabulate(table_data, headers=["Username", "System Role"], tablefmt="fancy_grid"))
 
-    table = Table(title="Users")
-    table.add_column("ID", style="cyan")
-    table.add_column("Name", style="white")
-    table.add_column("Role", style="magenta")
-    table.add_column("Projects", style="green")
+#  PROJECT SUBSYSTEM 
+@bughive.group(name="project")
+def project_group():
+    """Project workspaces allocation control panel."""
+    pass
 
-    for user in storage.users:
-        table.add_row(user.id, user.name, user.role, str(len(user.projects)))
-
-    console.print(table)
-
-
-# PROJECT commands
-
-def cmd_add_project(args, storage):
-    owner = resolve_user(storage, args.owner)
-    if not owner:
-        console.print(f"[red]No user found matching '{args.owner}'.[/red]")
+@project_group.command(name="create")
+@click.argument("name")
+@click.argument("description")
+def create_project(name, description):
+    db = load_db()
+    if name in db["projects"]:
+        click.echo(Fore.RED + f"Error: Project '{name}' already exists.")
         return
+    
+    proj = Project(name, description)
+    db["projects"][name] = proj.to_dict()
+    save_db(db)
+    click.echo(Fore.GREEN + f"Success: Workspace '{name}' created successfully.")
 
-    if storage.get_project_by_name(args.name):
-        console.print(f"[red]A project named '{args.name}' already exists.[/red]")
+@project_group.command(name="assign")
+@click.argument("project_name")
+@click.argument("username")
+def assign_user(project_name, username):
+    db = load_db()
+    if project_name not in db["projects"] or username not in db["users"]:
+        click.echo(Fore.RED + "Error: Target Project or Username parameters not found.")
         return
+    
+    proj = Project.from_dict(db["projects"][project_name])
+    if proj.assign_user(username):
+        db["projects"][project_name] = proj.to_dict()
+        save_db(db)
+        click.echo(Fore.GREEN + f"Success: User '{username}' assigned to '{project_name}'.")
+    else:
+        click.echo(Fore.YELLOW + f"Notice: {username} is already assigned to this project.")
 
-    project = Project(name=args.name, owner_id=owner.id)
-    storage.add_project(project)
-    owner.assign_project(project.id)        # keep the relationship in sync
-    storage.save()
+@project_group.command(name="list")
+@click.option("--owner", help="Filter tracking by assigned worker.")
+def list_projects(owner):
+    db = load_db()
+    table_data = []
+    for p in db["projects"].values():
+        proj = Project.from_dict(p)
+        if owner and owner not in proj.members:
+            continue
+        table_data.append([proj.name, proj.description, ", ".join(proj.members) or "None"])
+        
+    if not table_data:
+        click.echo(Fore.YELLOW + "No projects matching evaluation matrices found.")
+    else:
+        click.echo(tabulate(table_data, headers=["Project Name", "Description", "Assigned Staff"], tablefmt="fancy_grid"))
 
-    console.print(f"[green]Project created:[/green] {project.name} "
-                   f"(owner: [bold]{owner.name}[/bold], id: {project.id})")
+# BUG SUBSYSTEM
 
+@bughive.group(name="bug")
+def bug_group():
+    """Bug tracking mechanics."""
+    pass
 
-def cmd_list_projects(args, storage):
-    projects = storage.projects
-
-    if args.user:
-        owner = resolve_user(storage, args.user)
-        if not owner:
-            console.print(f"[red]No user found matching '{args.user}'.[/red]")
-            return
-        projects = storage.get_projects_by_user(owner.id)
-
-    if not projects:
-        console.print("[yellow]No projects found.[/yellow]")
+@bug_group.command(name="report")
+@click.argument("title")
+@click.argument("project_name")
+@click.option("--severity", default="medium", type=click.Choice(["low", "medium", "high"]))
+@click.option("--assign", help="Comma-separated assignees names.")
+def report_bug(title, project_name, severity, assign):
+    db = load_db()
+    if project_name not in db["projects"]:
+        click.echo(Fore.RED + f"Error: Project workflow target '{project_name}' does not exist.")
         return
+    
+    db["bug_counter"] += 1
+    new_id = db["bug_counter"]
+    assignees = [a.strip() for a in assign.split(",")] if assign else []
+    
+    bug = Bug(new_id, title, project_name, severity, assignees)
+    db["bugs"][str(new_id)] = bug.to_dict()
+    save_db(db)
+    click.echo(Fore.GREEN + f"Success: Ticket #{new_id} ('{title}') logged against [{project_name}].")
 
-    table = Table(title="Projects")
-    table.add_column("ID", style="cyan")
-    table.add_column("Name", style="white")
-    table.add_column("Owner", style="magenta")
-    table.add_column("Bugs", style="green")
-    table.add_column("Created", style="dim")
-
-    for project in projects:
-        owner = storage.get_user_by_id(project.owner_id)
-        owner_name = owner.name if owner else "unknown"
-        table.add_row(project.id, project.name, owner_name,
-                       str(len(project.bugs)), project.created_at)
-
-    console.print(table)
-
-
-#BUG commands
-
-def cmd_add_bug(args, storage):
-    project = resolve_project(storage, args.project)
-    if not project:
-        console.print(f"[red]No project found matching '{args.project}'.[/red]")
+@bug_group.command(name="resolve")
+@click.argument("bug_id", type=int)
+def resolve_bug(bug_id):
+    db = load_db()
+    if str(bug_id) not in db["bugs"]:
+        click.echo(Fore.RED + f"Error: Bug verification check failed for ticket ID #{bug_id}.")
         return
-
-    try:
-        bug = Bug(
-            title=args.title,
-            description=args.description or "",
-            severity=args.severity,
-            project_id=project.id,
-        )
-    except ValueError as e:
-        console.print(f"[red]{e}[/red]")
+    
+    bug = Bug.from_dict(db["bugs"][str(bug_id)])
+    if not bug.resolve():
+        click.echo(Fore.YELLOW + f"Notice: Bug #{bug_id} has already been marked resolved.")
         return
+    
+    db["bugs"][str(bug_id)] = bug.to_dict()
+    click.echo(Fore.CYAN + f"Ticket closed! Calculating gamified reward shares for: {', '.join(bug.assignees)}")
+    
+    # Process game metrics engine payouts
+    for user in bug.assignees:
+        if user in db["gamification"]:
+            profile = Gamification.from_dict(user, db["gamification"][user])
+            summary = profile.award_xp_for_severity(bug.severity)
+            db["gamification"][user] = profile.to_dict()
+            
+            click.echo(Fore.WHITE + f" -> {user} received +{summary['xp_gained']} XP.")
+            if summary["leveled_up"]:
+                click.echo(Fore.GREEN + Style.BRIGHT + f"   🌟 LEVEL UP! {user} scaled to Level {profile.level}!")
+            for badge in summary["badges_earned"]:
+                click.echo(Fore.MAGENTA + Style.BRIGHT + f"   🏆 ACHIEVEMENT UNLOCKED: [{badge}]!")
+                
+    save_db(db)
 
-    storage.add_bug(bug)
-    project.add_bug(bug.id)                  # keep the relationship in sync
-    storage.save()
+@bug_group.command(name="list")
+@click.option("--status", type=click.Choice(["open", "resolved"]))
+@click.option("--severity", type=click.Choice(["low", "medium", "high"]))
+@click.option("--search", help="Title keyword substring matches.")
+def list_bugs(status, severity, search):
+    db = load_db()
+    table_data = []
+    for b in db["bugs"].values():
+        bug = Bug.from_dict(b)
+        if status and bug.status != status:
+            continue
+        if severity and bug.severity != severity:
+            continue
+        if search and search.lower() not in bug.title.lower():
+            continue
+        table_data.append([bug.bug_id, bug.title, bug.project_name, bug.severity.upper(), bug.status, ", ".join(bug.assignees)])
+        
+    if not table_data:
+        click.echo(Fore.YELLOW + "No matching bug issues tracked under current parameter variants.")
+    else:
+        click.echo(tabulate(table_data, headers=["ID", "Title Summary", "Project", "Priority", "Status", "Workers"], tablefmt="fancy_grid"))
 
-    severity_color = {"low": "green", "medium": "yellow", "high": "red"}[bug.severity]
-    console.print(f"[green]Bug reported:[/green] {bug.title} "
-                   f"(severity: [{severity_color}]{bug.severity}[/{severity_color}], "
-                   f"project: [bold]{project.name}[/bold], id: {bug.id})")
-
-
-def cmd_assign_bug(args, storage):
-    bug = resolve_bug(storage, args.bug_id)
-    if not bug:
-        console.print(f"[red]No bug found with id '{args.bug_id}'.[/red]")
+# GAMIFICATION SUBSYSTEM
+@bughive.command(name="leaderboard")
+def leaderboard():
+    """Rank all developers based on current total experience tracking indices."""
+    db = load_db()
+    if not db["gamification"]:
+        click.echo(Fore.YELLOW + "No registered developers found on active rank leaderboards.")
         return
-
-    user = resolve_user(storage, args.to)
-    if not user:
-        console.print(f"[red]No user found matching '{args.to}'.[/red]")
-        return
-
-    bug.assign(user.id)
-    storage.save()
-
-    console.print(f"[green]{user.name}[/green] assigned to bug "
-                   f"'[bold]{bug.title}[/bold]' (id: {bug.id})")
-
-
-def cmd_resolve_bug(args, storage):
-    bug = resolve_bug(storage, args.bug_id)
-    if not bug:
-        console.print(f"[red]No bug found with id '{args.bug_id}'.[/red]")
-        return
-
-    if bug.status == "resolved":
-        console.print(f"[yellow]Bug '{bug.title}' is already resolved.[/yellow]")
-        return
-
-    bug.resolve()
-    storage.save()
-
-    console.print(f"[green]Bug resolved:[/green] {bug.title} "
-                   f"(resolved on {bug.resolved_at})")
-
-
-def cmd_reopen_bug(args, storage):
-    bug = resolve_bug(storage, args.bug_id)
-    if not bug:
-        console.print(f"[red]No bug found with id '{args.bug_id}'.[/red]")
-        return
-
-    if bug.status == "open":
-        console.print(f"[yellow]Bug '{bug.title}' is already open.[/yellow]")
-        return
-
-    bug.reopen()
-    storage.save()
-
-    console.print(f"[green]Bug reopened:[/green] {bug.title}")
-
-
-def cmd_list_bugs(args, storage):
-    bugs = storage.bugs
-
-    if args.project:
-        project = resolve_project(storage, args.project)
-        if not project:
-            console.print(f"[red]No project found matching '{args.project}'.[/red]")
-            return
-        bugs = storage.get_bugs_by_project(project.id)
-
-    if args.status:
-        bugs = [b for b in bugs if b.status == args.status]
-
-    if args.severity:
-        bugs = [b for b in bugs if b.severity == args.severity]
-
-    _print_bug_table(storage, bugs, title="Bugs")
-
-
-def cmd_search_bugs(args, storage):
-    bugs = storage.search_bugs(args.keyword)
-    _print_bug_table(storage, bugs, title=f"Search results for '{args.keyword}'")
-
-
-def _print_bug_table(storage, bugs, title="Bugs"):
-    if not bugs:
-        console.print("[yellow]No bugs found.[/yellow]")
-        return
-
-    table = Table(title=title)
-    table.add_column("ID", style="cyan")
-    table.add_column("Title", style="white")
-    table.add_column("Severity")
-    table.add_column("Status")
-    table.add_column("Project", style="magenta")
-    table.add_column("Assignees", style="green")
-
-    severity_color = {"low": "green", "medium": "yellow", "high": "red"}
-    status_color = {"open": "red", "resolved": "green"}
-
-    for bug in bugs:
-        project = storage.get_project_by_id(bug.project_id)
-        project_name = project.name if project else "unknown"
-
-        assignee_names = []
-        for uid in bug.assignees:
-            user = storage.get_user_by_id(uid)
-            assignee_names.append(user.name if user else uid)
-
-        sev_style = severity_color.get(bug.severity, "white")
-        status_style = status_color.get(bug.status, "white")
-
-        table.add_row(
-            bug.id,
-            bug.title,
-            f"[{sev_style}]{bug.severity}[/{sev_style}]",
-            f"[{status_style}]{bug.status}[/{status_style}]",
-            project_name,
-            ", ".join(assignee_names) if assignee_names else "-",
-        )
-
-    console.print(table)
-
-
-# Argument parser setup
-
-def build_parser():
-    parser = argparse.ArgumentParser(
-        prog="bughive",
-        description="BugHive — a CLI bug tracker for development teams.",
-    )
-    subparsers = parser.add_subparsers(dest="command")
-
-    # --- add ---
-    add_parser = subparsers.add_parser("add", help="Add a user, project, or bug")
-    add_subparsers = add_parser.add_subparsers(dest="entity")
-
-    add_user = add_subparsers.add_parser("user", help="Add a new user")
-    add_user.add_argument("--name", required=True, help="Name of the user")
-    add_user.add_argument("--role", choices=User.VALID_ROLES, default="developer",
-                           help="Role of the user (default: developer)")
-    add_user.set_defaults(func=cmd_add_user)
-
-    add_project = add_subparsers.add_parser("project", help="Add a new project")
-    add_project.add_argument("--name", required=True, help="Name of the project")
-    add_project.add_argument("--owner", required=True,
-                              help="Owner's user ID or name")
-    add_project.set_defaults(func=cmd_add_project)
-
-    add_bug = add_subparsers.add_parser("bug", help="Report a new bug")
-    add_bug.add_argument("--title", required=True, help="Bug title")
-    add_bug.add_argument("--description", default="", help="Bug description")
-    add_bug.add_argument("--severity", choices=Bug.VALID_SEVERITIES, default="medium",
-                          help="Bug severity (default: medium)")
-    add_bug.add_argument("--project", required=True, help="Project ID or name")
-    add_bug.set_defaults(func=cmd_add_bug)
-
-    # --- list ---
-    list_parser = subparsers.add_parser("list", help="List users, projects, or bugs")
-    list_subparsers = list_parser.add_subparsers(dest="entity")
-
-    list_users = list_subparsers.add_parser("users", help="List all users")
-    list_users.set_defaults(func=cmd_list_users)
-
-    list_projects = list_subparsers.add_parser("projects", help="List projects")
-    list_projects.add_argument("--user", help="Filter by owner's user ID or name")
-    list_projects.set_defaults(func=cmd_list_projects)
-
-    list_bugs = list_subparsers.add_parser("bugs", help="List bugs")
-    list_bugs.add_argument("--project", help="Filter by project ID or name")
-    list_bugs.add_argument("--status", choices=Bug.VALID_STATUSES, help="Filter by status")
-    list_bugs.add_argument("--severity", choices=Bug.VALID_SEVERITIES, help="Filter by severity")
-    list_bugs.set_defaults(func=cmd_list_bugs)
-
-    # --- assign ---
-    assign_parser = subparsers.add_parser("assign", help="Assign a bug to a developer")
-    assign_subparsers = assign_parser.add_subparsers(dest="entity")
-
-    assign_bug = assign_subparsers.add_parser("bug", help="Assign a bug to a user")
-    assign_bug.add_argument("bug_id", help="ID of the bug")
-    assign_bug.add_argument("--to", required=True, help="User ID or name to assign")
-    assign_bug.set_defaults(func=cmd_assign_bug)
-
-    # --- resolve ---
-    resolve_parser = subparsers.add_parser("resolve", help="Mark a bug as resolved")
-    resolve_subparsers = resolve_parser.add_subparsers(dest="entity")
-
-    resolve_bug_p = resolve_subparsers.add_parser("bug", help="Resolve a bug")
-    resolve_bug_p.add_argument("bug_id", help="ID of the bug")
-    resolve_bug_p.set_defaults(func=cmd_resolve_bug)
-
-    # --- reopen ---
-    reopen_parser = subparsers.add_parser("reopen", help="Reopen a resolved bug")
-    reopen_subparsers = reopen_parser.add_subparsers(dest="entity")
-
-    reopen_bug_p = reopen_subparsers.add_parser("bug", help="Reopen a bug")
-    reopen_bug_p.add_argument("bug_id", help="ID of the bug")
-    reopen_bug_p.set_defaults(func=cmd_reopen_bug)
-
-    # --- search ---
-    search_parser = subparsers.add_parser("search", help="Search bugs by keyword")
-    search_subparsers = search_parser.add_subparsers(dest="entity")
-
-    search_bugs = search_subparsers.add_parser("bugs", help="Search bugs by title keyword")
-    search_bugs.add_argument("--keyword", required=True, help="Keyword to search for")
-    search_bugs.set_defaults(func=cmd_search_bugs)
-
-    return parser
-
-
-def main():
-    parser = build_parser()
-    args = parser.parse_args()
-
-    if not hasattr(args, "func"):
-        parser.print_help()
-        sys.exit(1)
-
-    storage = Storage()
-    storage.load()
-
-    args.func(args, storage)
-
+    
+    profiles = [Gamification.from_dict(k, v) for k, v in db["gamification"].items()]
+    profiles.sort(key=lambda x: x.xp, reverse=True)
+    
+    table_data = [[idx + 1, p.username, p.xp, p.level, ", ".join(p.badges) or "None"] for idx, p in enumerate(profiles)]
+    click.echo(tabulate(table_data, headers=["Rank", "Developer", "XP Score", "Level Title", "Badges Ledger"], tablefmt="fancy_grid"))
 
 if __name__ == "__main__":
-    main()
+    bughive()

@@ -1,77 +1,38 @@
-import uuid
-from datetime import date
-
+import datetime
 
 class Bug:
-    """
-    Represents a bug/task in the BugHive system.
-    A Bug belongs to one Project, but can have many assignees (developers)
-    working on it (many-to-many relationship: bugs <-> users).
-    """
-
-    VALID_SEVERITIES = ("low", "medium", "high")
-    VALID_STATUSES = ("open", "resolved")
-
-    def __init__(self, title, description, severity, project_id):
-        if severity not in Bug.VALID_SEVERITIES:
-            raise ValueError(
-                f"Severity must be one of {Bug.VALID_SEVERITIES}, got '{severity}'"
-            )
-
-        self.id = str(uuid.uuid4())[:8]     # short unique ID
+    def __init__(self, bug_id, title, project_name, severity, assignees=None, status="open", created_at=None, resolved_at=None):
+        self.bug_id = int(bug_id)
         self.title = title
-        self.description = description
-        self.severity = severity
-        self.status = "open"                # open or resolved
-        self.project_id = project_id        # FK -> Project.id
-        self.assignees = []                 # list of user IDs (many-to-many)
-        self.created_at = str(date.today())
-        self.resolved_at = None
-
-    def assign(self, user_id):
-        # Add a developer (user ID) to this bug's list of assignees.
-        if user_id not in self.assignees:
-            self.assignees.append(user_id)
-
-    def unassign(self, user_id):
-        # Remove a developer (user ID) from this bug's assignees.
-        if user_id in self.assignees:
-            self.assignees.remove(user_id)
+        self.project_name = project_name
+        self.severity = severity.lower()  # low, medium, high
+        self.assignees = assignees if assignees is not None else []
+        self.status = status  # open, resolved
+        self.created_at = created_at or datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        self.resolved_at = resolved_at
 
     def resolve(self):
-        # Mark this bug as resolved and record the resolution date.
-        self.status = "resolved"
-        self.resolved_at = str(date.today())
-
-    def reopen(self):
-        # Reopen a resolved bug — sets status back to open.
-        self.status = "open"
-        self.resolved_at = None
+        if self.status == "open":
+            self.status = "resolved"
+            self.resolved_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+            return True
+        return False
 
     def to_dict(self):
-        # Convert this Bug object into a JSON-serialisable dictionary.
         return {
-            "id": self.id,
+            "bug_id": self.bug_id,
             "title": self.title,
-            "description": self.description,
+            "project_name": self.project_name,
             "severity": self.severity,
-            "status": self.status,
-            "project_id": self.project_id,
             "assignees": self.assignees,
+            "status": self.status,
             "created_at": self.created_at,
-            "resolved_at": self.resolved_at,
+            "resolved_at": self.resolved_at
         }
 
-    @classmethod
-    def from_dict(cls, data):
-        # Rebuild a Bug object from a dictionary (e.g. loaded from JSON).
-        bug = cls(data["title"], data["description"], data["severity"], data["project_id"])
-        bug.id = data["id"]
-        bug.status = data["status"]
-        bug.assignees = data["assignees"]
-        bug.created_at = data["created_at"]
-        bug.resolved_at = data["resolved_at"]
-        return bug
-
-    def __repr__(self):
-        return f"Bug(id={self.id}, title='{self.title}', status='{self.status}')"
+    @staticmethod
+    def from_dict(data):
+        return Bug(
+            data["bug_id"], data["title"], data["project_name"], data["severity"],
+            data.get("assignees", []), data["status"], data["created_at"], data["resolved_at"]
+        )
