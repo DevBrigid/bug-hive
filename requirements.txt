@@ -1,0 +1,10 @@
+-e git+ssh://git@github.com/DevBrigid/bug-hive.git@2c35d4d73e5c014434da6c08fe0f7f5711e13237#egg=bughive
+click==8.4.1
+colorama==0.4.6
+iniconfig==2.3.0
+packaging==26.2
+pluggy==1.6.0
+Pygments==2.20.0
+pytest==9.1.0
+setuptools==82.0.1
+tabulate==0.10.0
