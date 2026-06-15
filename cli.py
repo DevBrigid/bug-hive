@@ -132,7 +132,7 @@ def report_bug(title, project_name, severity, assign):
     color = Fore.GREEN if res["success"] else Fore.RED
     click.echo(color + res["message"])
 
-@bughive.command(name="resolve")
+@bug_group.command(name="resolve")
 @click.argument("bug_id", type=int)
 def resolve_bug(bug_id):
     enforce_role(required_role="developer") # ONLY developers can resolve bugs for XP!

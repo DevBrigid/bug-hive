@@ -24,16 +24,18 @@
             "title": "Login page failing",
             "project_name": "Mobile Core",
             "severity": "medium",
-            "assignees": [],
-            "status": "open",
+            "assignees": [
+                "Bob"
+            ],
+            "status": "resolved",
             "created_at": "2026-06-15 10:18",
-            "resolved_at": null
+            "resolved_at": "2026-06-15 10:30"
         }
     },
     "gamification": {
         "Bob": {
             "username": "Bob",
-            "xp": 0,
+            "xp": 50,
             "level": 1,
             "badges": []
         }
