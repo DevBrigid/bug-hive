@@ -14,5 +14,5 @@ def test_milestone_badge_unlocks():
     summary = g.award_xp_for_severity("medium")  # Triggers milestone checks
     
     assert "Bug Scout" in g.badges
-    assert "💻 Developer" in g.badges
-    assert "💀 Exterminator" not in g.badges  # Requires 1000 XP
+    assert "Developer" in g.badges
+    assert "Exterminator" not in g.badges  # Requires 1000 XP

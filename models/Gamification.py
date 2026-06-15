@@ -6,22 +6,19 @@ class Gamification:
         self.badges = badges if badges is not None else []
 
     def award_xp_for_severity(self, severity):
+        # Mutates player state based on localized core gaming mechanics
         xp_map = {"low": 20, "medium": 50, "high": 80}
         reward = xp_map.get(severity.lower(), 20)
         self.xp += reward
         
-        # Level up threshold rules (Every 200 XP = 1 Level)
+        # Level tier progression rules
         new_level = (self.xp // 200) + 1
         leveled_up = new_level > self.level
         self.level = new_level
 
-        # Milestone badges checks
+        # Badge verification checks
         new_badges = []
-        milestones = [
-            (100, "Bug Scout"),
-            (500, "Developer"),
-            (1000, "Exterminator")
-        ]
+        milestones = [(100, "Bug Scout"), (500, "Developer"), (1000, "Exterminator")]
         for milestone_xp, badge_name in milestones:
             if self.xp >= milestone_xp and badge_name not in self.badges:
                 self.badges.append(badge_name)
