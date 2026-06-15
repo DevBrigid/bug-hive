@@ -3,7 +3,7 @@ from models.User import User
 from models.Gamification import Gamification
 
 def create_user_task(username, role):
-    """Orchestrates adding a user and preparing gamification states if developer."""
+    # Orchestrates adding a user and preparing gamification states if developer.
     db = load_db()
     if username in db["users"]:
         return {"success": False, "message": f"The username '{username}' already exists."}
@@ -18,6 +18,19 @@ def create_user_task(username, role):
     return {"success": True, "message": f"Registered {username} as a team '{role}'."}
 
 def get_all_users_task():
-    """Retrieves all raw user data rows from persistence."""
+    # Retrieves all raw user data rows from persistence.
     db = load_db()
     return list(db["users"].values())
+
+def delete_user_task(username):
+    # Removes a user from the database and cleans up associated gamification data.
+    db = load_db()
+    if username not in db["users"]:
+        return {"success": False, "message": f"User '{username}' not found."}
+    
+    del db["users"][username]
+    if username in db["gamification"]:
+        del db["gamification"][username]
+    
+    save_db(db)
+    return {"success": True, "message": f"User '{username}' has been deleted."}

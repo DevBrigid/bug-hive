@@ -4,12 +4,12 @@ A gamified bug tracking and project management CLI tool with role-based authenti
 
 ## Features
 
-- **🔐 Authentication**: Role-based access control with Admin and Developer profiles
-- **🎮 Gamification**: Leaderboard system, points for bug resolutions, and achievement tracking
-- **🐛 Bug Management**: Report, track, and resolve bugs with severity levels and assignees
-- **📋 Project Management**: Create and manage projects with team member assignments
-- **👥 User Management**: Admin capabilities for user creation and role management
-- **💾 Persistent Storage**: JSON-based data persistence for all records
+- ** Authentication**: Role-based access control with Admin and Developer profiles
+- ** Gamification**: Leaderboard system, points for bug resolutions, and achievement tracking
+- ** Bug Management**: Report, track, and resolve bugs with severity levels and assignees
+- ** Project Management**: Create and manage projects with team member assignments
+- ** User Management**: Admin capabilities for user creation and role management
+- ** Persistent Storage**: JSON-based data persistence for all records
 
 ## Installation
 
@@ -21,11 +21,16 @@ A gamified bug tracking and project management CLI tool with role-based authenti
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/DevBrigid/bug-hive.git
 cd BugHive
 ```
 
-2. Install the package in development mode:
+2. Install dependencies using requirements.txt:
+```bash
+pip install -r requirements.txt
+```
+
+**OR** install the package in development mode:
 ```bash
 pip install -e .
 ```
@@ -53,7 +58,7 @@ bughive logout
 
 **Create a new user:**
 ```bash
-bughive user create <username> <role>
+bughive user add <username> <role>
 ```
 Roles: `admin`, `developer`
 
@@ -62,11 +67,16 @@ Roles: `admin`, `developer`
 bughive user list
 ```
 
+**Delete a user:**
+```bash
+bughive user delete <username>
+```
+
 ### Project Management
 
 **Create a project:**
 ```bash
-bughive project create <project_name>
+bughive project create <project_name> <prjoect_description> #optional
 ```
 
 **List projects:**
@@ -83,13 +93,31 @@ bughive project assign <username> <project_name>
 
 **Report a bug:**
 ```bash
-bughive bug report <title> <project_name> <severity>
+bughive bug report <title> <project_name> [--severity <level>] [--assign <assignees>]
 ```
-Severity levels: `low`, `medium`, `high`
+Severity levels: `low`, `medium` (default), `high`
+
+**Examples:**
+```bash
+bughive bug report "Login page failing" "Mobile Core" --severity high
+bughive bug report "Missing button" "Mobile Core" --severity medium --assign user1,user2
+```
 
 **List bugs:**
 ```bash
 bughive bug list [project_name]
+```
+
+**Assign developers to a bug:**
+```bash
+bughive bug assign <bug_id> <assignees>
+```
+Assignees: Comma-separated list of usernames
+
+**Examples:**
+```bash
+bughive bug assign 1 john_dev
+bughive bug assign 1 john_dev,jane_dev,alex_dev
 ```
 
 **Resolve a bug:**
@@ -111,6 +139,8 @@ BugHive/
 ├── cli.py                 # Main CLI interface
 ├── storage.py             # Data persistence layer
 ├── db.json               # JSON database file
+├── setup.py              # Package configuration
+├── requirements.txt      # Python dependencies
 ├── models/               # Data models
 │   ├── User.py          # User model with roles
 │   ├── Bug.py           # Bug tracking model
@@ -126,7 +156,7 @@ BugHive/
 │   ├── test_bug.py
 │   ├── test_project.py
 │   └── test_gamification.py
-└── setup.py             # Package configuration
+└── README.md            # Project documentation
 ```
 
 ## Architecture
@@ -134,7 +164,7 @@ BugHive/
 ### Authentication System
 - Session-based login with role validation
 - Two roles: **Admin** (full access) and **Developer** (limited access)
-- Admin commands: user creation, project assignment
+- Admin commands: user creation, user deletion, project assignment
 - Developer commands: bug reporting, bug resolution viewing
 
 ### Database
@@ -153,8 +183,9 @@ BugHive/
 |---------|------|-------------|
 | `login` | Any | Authenticate with username |
 | `logout` | Any | Clear session |
-| `user create` | Admin | Create new user |
+| `user add` | Admin | Create new user |
 | `user list` | Admin | List all users |
+| `user delete` | Admin | Delete a user |
 | `project create` | Any | Create project |
 | `project list` | Any | List projects |
 | `project assign` | Admin | Assign user to project |

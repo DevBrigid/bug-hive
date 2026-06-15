@@ -68,3 +68,24 @@ def get_leaderboard_task():
     profiles = [Gamification.from_dict(k, v) for k, v in db["gamification"].items()]
     profiles.sort(key=lambda x: x.xp, reverse=True)
     return profiles
+
+def assign_bug_task(bug_id, assign_string):
+    # Updates bug assignments to new developers.
+    db = load_db()
+    if str(bug_id) not in db["bugs"]:
+        return {"success": False, "message": f"Bug verification check failed for ticket ID #{bug_id}."}
+    
+    bug = Bug.from_dict(db["bugs"][str(bug_id)])
+    assignees = [a.strip() for a in assign_string.split(",")] if assign_string else []
+    
+    # Validate that all assignees exist
+    for assignee in assignees:
+        if assignee not in db["users"]:
+            return {"success": False, "message": f"User '{assignee}' not found in system."}
+    
+    bug.assignees = assignees
+    db["bugs"][str(bug_id)] = bug.to_dict()
+    save_db(db)
+    
+    assignee_list = ", ".join(assignees) if assignees else "None"
+    return {"success": True, "message": f"Ticket #{bug_id} reassigned to: {assignee_list}"}

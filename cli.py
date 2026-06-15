@@ -3,9 +3,9 @@ from tabulate import tabulate
 from colorama import Fore, Style, init
 
 from tasks import (
-    create_user_task, get_all_users_task,
+    create_user_task, get_all_users_task, delete_user_task,
     create_project_task, assign_user_to_project_task, list_projects_task,
-    report_bug_task, resolve_bug_task, list_bugs_task, get_leaderboard_task,
+    report_bug_task, resolve_bug_task, list_bugs_task, get_leaderboard_task, assign_bug_task,
     login_task, logout_task, get_current_user_or_raise
 )
 
@@ -71,6 +71,14 @@ def list_users():
         return
     table = [[u["username"], u["role"]] for u in users]
     click.echo(tabulate(table, headers=["Username", "System Role"], tablefmt="fancy_grid"))
+
+@user_group.command(name="delete")
+@click.argument("username")
+def delete_user(username):
+    enforce_role(required_role="admin") # Guard check
+    res = delete_user_task(username)
+    color = Fore.GREEN if res["success"] else Fore.RED
+    click.echo(color + res["message"])
 
 # PROJECT SUBSYSTEM (ADMIN ONLY FOR MUTATIONS)
 @bughive.group(name="project")
@@ -153,6 +161,15 @@ def list_bugs(status, severity, search):
         return
     table = [[b.bug_id, b.title, b.project_name, b.severity.upper(), b.status, ", ".join(b.assignees)] for b in bugs]
     click.echo(tabulate(table, headers=["ID", "Title Summary", "Project", "Priority", "Status", "Workers"], tablefmt="fancy_grid"))
+
+@bug_group.command(name="assign")
+@click.argument("bug_id", type=int)
+@click.argument("assignees")
+def assign_bug(bug_id, assignees):
+    enforce_role() # Anyone logged in can reassign bugs
+    res = assign_bug_task(bug_id, assignees)
+    color = Fore.GREEN if res["success"] else Fore.RED
+    click.echo(color + res["message"])
 
 # LEADERBOARD
 @bughive.command(name="leaderboard")

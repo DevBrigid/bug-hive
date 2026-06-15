@@ -1,7 +1,8 @@
 # Cleanly expose service actions for the CLI layer to import directly
 from .user_tasks import (
     create_user_task, 
-    get_all_users_task
+    get_all_users_task,
+    delete_user_task
 )
 
 from .project_tasks import (
@@ -14,7 +15,8 @@ from .bug_tasks import (
     report_bug_task, 
     resolve_bug_task, 
     list_bugs_task, 
-    get_leaderboard_task
+    get_leaderboard_task,
+    assign_bug_task
 )
 from .auth_task import (
     login_task, 
