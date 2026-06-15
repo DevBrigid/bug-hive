@@ -16,3 +16,8 @@ from .bug_tasks import (
     list_bugs_task, 
     get_leaderboard_task
 )
+from .auth_task import (
+    login_task, 
+    logout_task, 
+    get_current_user_or_raise
+)
