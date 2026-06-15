@@ -2,8 +2,8 @@ import json
 import os
 
 from models.User import User
-from models.project import Project
-from models.bug import Bug
+from models.Project import Project
+from models.Bug import Bug
 
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "data", "db.json")
@@ -21,9 +21,8 @@ class Storage:
         self.projects = []
         self.bugs = []
 
-    # ------------------------------------------------------------------
+   
     # USERS
-    # ------------------------------------------------------------------
 
     def add_user(self, user: User):
         self.users.append(user)
@@ -40,9 +39,7 @@ class Storage:
                 return user
         return None
 
-    # ------------------------------------------------------------------
     # PROJECTS
-    # ------------------------------------------------------------------
 
     def add_project(self, project: Project):
         self.projects.append(project)
@@ -62,9 +59,7 @@ class Storage:
     def get_projects_by_user(self, user_id):
         return [p for p in self.projects if p.owner_id == user_id]
 
-    # ------------------------------------------------------------------
     # BUGS
-    # ------------------------------------------------------------------
 
     def add_bug(self, bug: Bug):
         self.bugs.append(bug)
@@ -93,9 +88,7 @@ class Storage:
             results = [b for b in results if b.severity == severity]
         return results
 
-    # ------------------------------------------------------------------
     # PERSISTENCE
-    # ------------------------------------------------------------------
 
     def save(self):
         """Write all current data to the JSON file."""
