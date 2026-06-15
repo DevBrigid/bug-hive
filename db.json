@@ -1,0 +1,12 @@
+{
+    "users": {
+        "Alice": {
+            "username": "Alice",
+            "role": "admin"
+        }
+    },
+    "projects": {},
+    "bugs": {},
+    "gamification": {},
+    "bug_counter": 0
+}
